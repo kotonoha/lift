@@ -95,7 +95,7 @@ object LiftSession {
   @volatile private var constructorCache: Map[(Class[_], Box[Class[_]]), Box[ConstructorType]] = Map()
 
   private[http] def constructFrom[T](session: LiftSession, pp: Box[ParamPair], clz: Class[T]): Box[T] = {
-    def calcConstructor(): Box[ConstructorType] = {
+    def calcConstructorBuiltin(): Box[ConstructorType] = {
       val const = clz.getDeclaredConstructors()
 
       def nullConstructor(): Box[ConstructorType] =
@@ -124,6 +124,10 @@ object LiftSession {
       }
     }
 
+    def calcConstructor() = {
+      LiftRules.snippetInstantiation.flatMap(_.factoryFor(clz)).or(calcConstructorBuiltin())
+    }
+
     (if (Props.devMode) {
       // no caching in dev mode
       calcConstructor()
@@ -137,11 +141,7 @@ object LiftSession {
           nv
         }
       }
-    }).map {
-      case uc: UnitConstructor => uc.makeOne
-      case pc: PConstructor => pc.makeOne(pp.openOrThrowException("It's ok").v)
-      case psc: PAndSessionConstructor => psc.makeOne(pp.openOrThrowException("It's ok").v, session)
-    }
+    }).map { _.makeOne[T](pp, session) }
   }
 
   /**
@@ -1403,7 +1403,7 @@ class LiftSession(private[http] val _contextPath: String, val uniqueId: String,
       LiftSession.constructFrom(this,
         S.location.flatMap(_.
           currentValue.map(v =>
-          ParamPair(v, v.asInstanceOf[Object].getClass))),
+          ParamPair(v.asInstanceOf[AnyRef], v.asInstanceOf[Object].getClass))),
         c)
 
     } catch {

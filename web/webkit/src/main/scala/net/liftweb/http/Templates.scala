@@ -353,35 +353,64 @@ class StateInStatelessException(msg: String) extends SnippetFailureException(msg
 
 
   /**
-   * Holds a pair of parameters
-   */
-  private case class ParamPair(v: Any, clz: Class[_])
+ * Holds a pair of parameters
+ */
+case class ParamPair(v: AnyRef, clz: Class[_])
 
-  /**
-   * a trait that defines some ways of constructing an instance
-   */
-  private sealed trait ConstructorType
-  
-  /**
-   * A unit constructor... just pass in null
-   */
-  private final case class UnitConstructor(c: java.lang.reflect.Constructor[_]) extends ConstructorType {
-    def makeOne[T]: T = c.newInstance().asInstanceOf[T]
-  }
+/**
+ * a trait that defines some ways of constructing an instance
+ */
+sealed trait ConstructorType {
+  def makeOne[T](p: Box[ParamPair], session: LiftSession): T
+}
 
-  /**
-   * A parameter and session constructor
-   */
-  private final case class PAndSessionConstructor(c: java.lang.reflect.Constructor[_]) extends ConstructorType {
-    def makeOne[T](p: Any, s: LiftSession): T = 
-      c.newInstance(p.asInstanceOf[Object], s).asInstanceOf[T]
-  }
+trait SnippetInstantiation {
+  def factoryFor[T](clz: Class[T]): Box[ConstructorType]
+}
 
-  /**
-   * A parameter constructor
-   */
-  private final case class PConstructor(c: java.lang.reflect.Constructor[_]) extends ConstructorType {
-    def makeOne[T](p: Any): T = 
-      c.newInstance(p.asInstanceOf[Object]).asInstanceOf[T]
+object SnippetInstantiation {
+  type FactoryFn[T] = (Box[ParamPair], LiftSession) => T
+  type FactoryFnErased = (Box[ParamPair], LiftSession) => AnyRef
+
+  def apply[T](f: FactoryFn[T])(implicit m: Manifest[T]): ConstructorType = {
+    UserDefinedConstructor(f.asInstanceOf[FactoryFnErased], m.runtimeClass)
   }
+}
+
+/**
+ * A unit constructor... just pass in null
+ */
+private final case class UnitConstructor(c: java.lang.reflect.Constructor[_]) extends ConstructorType {
+  override def makeOne[T](p: Box[ParamPair], session: LiftSession): T = c.newInstance().asInstanceOf[T]
+}
+
+/**
+ * A parameter and session constructor
+ */
+private final case class PAndSessionConstructor(c: java.lang.reflect.Constructor[_]) extends ConstructorType {
+  override def makeOne[T](p: Box[ParamPair], s: LiftSession): T = {
+    val param = p.openOrThrowException("It's okay")
+    c.newInstance(param.v, s).asInstanceOf[T]
+  }
+}
+
+/**
+ * A parameter constructor
+ */
+private final case class PConstructor(c: java.lang.reflect.Constructor[_]) extends ConstructorType {
+  override def makeOne[T](p: Box[ParamPair], session: LiftSession): T = {
+    val param = p.openOrThrowException("It's okay")
+    c.newInstance(param.v).asInstanceOf[T]
+  }
+}
+
+private final case class UserDefinedConstructor(fn: (Box[ParamPair], LiftSession) => AnyRef, clz: Class[_]) extends ConstructorType {
+  override def makeOne[T](p: Box[ParamPair], session: LiftSession): T = {
+    val obj = fn(p, session)
+    if (!clz.isInstance(obj)) {
+      throw new ClassCastException(s"error in user-defined constructor for class: $clz, object was of class ${obj.getClass}")
+    }
+    obj.asInstanceOf[T]
+  }
+}
 

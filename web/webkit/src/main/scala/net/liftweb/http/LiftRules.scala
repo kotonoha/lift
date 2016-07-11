@@ -733,6 +733,8 @@ class LiftRules() extends Factory with FormVendor with LazyLoggable {
 
   private[http] def snippet(name: String): Box[DispatchSnippet] = NamedPF.applyBox(name, snippetDispatch.toList)
 
+  @volatile var snippetInstantiation: Box[SnippetInstantiation] = Empty
+
   /**
    * If the request times out (or returns a non-Response) you can
    * intercept the response here and create your own response
