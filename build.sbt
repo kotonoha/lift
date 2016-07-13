@@ -1,8 +1,8 @@
 import Dependencies._
 
-organization in ThisBuild          := "net.liftweb"
+organization in ThisBuild          := "ws.kotonoha.liftweb"
 
-version in ThisBuild :=  "2.6.3"
+version in ThisBuild :=  "2.6.3.di"
 
 homepage in ThisBuild              := Some(url("http://www.liftweb.net"))
 
@@ -21,13 +21,19 @@ libraryDependencies in ThisBuild <++= scalaVersion {sv => Seq(specs2(sv), scalac
 // Settings for Sonatype compliance
 pomIncludeRepository in ThisBuild  := { _ => false }
 
-publishTo in ThisBuild            <<= isSnapshot(if (_) Some(Opts.resolver.sonatypeSnapshots) else Some(Opts.resolver.sonatypeStaging))
+publishTo in ThisBuild            := {
+  val nexus = "http://10.228.147.22:9500/nexus/content/repositories/"
+  if (isSnapshot.value)
+    Some("snapshots" at nexus + "snapshots")
+  else
+    Some("releases"  at nexus + "releases")
+}
 
 scmInfo in ThisBuild               := Some(ScmInfo(url("https://github.com/lift/framework"), "scm:git:https://github.com/lift/framework.git"))
 
 pomExtra in ThisBuild              :=  Developers.toXml
 
-credentials in ThisBuild <+= state map { s => Credentials(BuildPaths.getGlobalSettingsDirectory(s, BuildPaths.getGlobalBase(s)) / ".credentials") }
+//credentials in ThisBuild <+= state map { s => Credentials(BuildPaths.getGlobalSettingsDirectory(s, BuildPaths.getGlobalBase(s)) / ".credentials") }
 
 initialize <<= (name, version, scalaVersion) apply printLogo
 
