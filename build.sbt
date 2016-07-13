@@ -37,7 +37,8 @@ pomExtra in ThisBuild              :=  Developers.toXml
 
 initialize <<= (name, version, scalaVersion) apply printLogo
 
+/*
 resolvers  in ThisBuild           ++= Seq(
   "snapshots"     at "https://oss.sonatype.org/content/repositories/snapshots",
   "releases"      at "https://oss.sonatype.org/content/repositories/releases"
-)
+)*/
